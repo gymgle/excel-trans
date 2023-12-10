@@ -102,7 +102,7 @@ def main(page: ft.Page):
                     continue
 
                 # Translate the cell value using Google Translate
-                translated_value = translator.translate(cell.value)
+                translated_value = translator.translate(str(cell.value))
                 print(f'{cell.value} -> {translated_value}')
 
                 # Overwrite the cell value with the translated value
