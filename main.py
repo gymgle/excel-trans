@@ -11,12 +11,27 @@ trans_file_path = ''
 trans_file_sheets = []
 
 # Define the constants
-cn_to_en = 'ZH ➟ EN'
-en_to_cn = 'EN ➟ ZH'
+lang_options = [
+    ('zh', 'en'),
+    ('en', 'zh'),
+    ('ru', 'en'),
+]
 cell_override = 'Override'
 cell_append = 'Append'
 api_google = 'Google Translate'
 api_baidu = 'Baidu Translate'
+
+
+def lang_opt_to_label(opt):
+    src, des = opt
+    return f'{src.upper()} ➟ {des.upper()}'
+
+
+def label_to_lang_opt(label):
+    return [x.lower() for x in label.split(" ➟ ")]
+
+
+trans_mem = {}
 
 
 def main(page: ft.Page):
@@ -31,9 +46,8 @@ def main(page: ft.Page):
         global trans_file_path
         global trans_file_sheets
         clean_trans_result(e)
-        ft_result_text.value = (
-            ', '.join(map(lambda f: f.name, e.files)) if e.files else "Cancelled!"
-        )
+        ft_result_text.value = (', '.join(map(lambda f: f.name, e.files))
+                                if e.files else "Cancelled!")
         if e.files:
             trans_file_path = e.files[0].path
             print(trans_file_path)
@@ -74,16 +88,16 @@ def main(page: ft.Page):
             page.update()
             return
 
-        total_cell = get_excel_cell_total(trans_file_path, ft_sheet_dropdown.value)
+        total_cell = get_excel_cell_total(trans_file_path,
+                                          ft_sheet_dropdown.value)
         # Copy to new file
         new_file_path = append_datetime(trans_file_path)
         copy_file(trans_file_path, new_file_path)
 
         # Start to translate the Excel file
         api_client = 'google' if ft_api_options.value == api_google else 'baidu'
-        src_lang, dst_lang = 'zh', 'en'
-        if ft_language_dropdown.value == en_to_cn:
-            src_lang, dst_lang = dst_lang, src_lang
+        src_lang, dst_lang = label_to_lang_opt(ft_language_dropdown.value)
+        print(src_lang, dst_lang)
         translator = create_translator(api_client, src_lang, dst_lang)
 
         ft_progress.value = 0
@@ -101,8 +115,19 @@ def main(page: ft.Page):
                 if not cell.value:
                     continue
 
-                # Translate the cell value using Google Translate
-                translated_value = translator.translate(str(cell.value))
+                if type(cell.value) != str:
+                    continue
+
+                if cell.value.isnumeric():
+                    continue
+
+                if cell.value in trans_mem:
+                    translated_value = trans_mem[cell.value]
+                else:
+                    # Translate the cell value using Google Translate
+                    translated_value = translator.translate(cell.value)
+                    trans_mem[cell.value] = translated_value
+
                 print(f'{cell.value} -> {translated_value}')
 
                 # Overwrite the cell value with the translated value
@@ -129,102 +154,102 @@ def main(page: ft.Page):
     ft_progress = ft.ProgressBar(width=400, visible=False)
     pick_files_dialog = ft.FilePicker(on_result=pick_files_result)
     ft_result_text = ft.Text(width=400)
-    ft_sheet_dropdown = ft.Dropdown(label='Sheet Translated',
-                                    hint_text='Select the sheet to be translated',
-                                    width=200,
-                                    options=[],
-                                    autofocus=True,
-                                    on_change=clean_trans_result,
-                                    )
-    ft_language_dropdown = ft.Dropdown(label='Language Option',
-                                       hint_text='Select the language Option',
-                                       width=200,
-                                       options=[
-                                           ft.dropdown.Option(cn_to_en),
-                                           ft.dropdown.Option(en_to_cn),
-                                       ],
-                                       value=cn_to_en,
-                                       on_change=clean_trans_result,
-                                       )
-    ft_cell_options = ft.Dropdown(label='Cell Option',
-                                  hint_text='Select the cell options',
-                                  width=200,
-                                  options=[
-                                      ft.dropdown.Option(cell_override),
-                                      ft.dropdown.Option(cell_append),
-                                  ],
-                                  value=cell_override,
-                                  on_change=clean_trans_result,
-                                  )
-    ft_api_options = ft.Dropdown(label='Translate API',
-                                 hint_text='Select API',
-                                 width=200,
-                                 options=[
-                                     ft.dropdown.Option(api_google),
-                                     ft.dropdown.Option(api_baidu),
-                                 ],
-                                 value=api_google,
-                                 on_change=clean_trans_result,
-                                 )
+    ft_sheet_dropdown = ft.Dropdown(
+        label='Sheet Translated',
+        hint_text='Select the sheet to be translated',
+        width=200,
+        options=[],
+        autofocus=True,
+        on_change=clean_trans_result,
+    )
+    ft_language_dropdown = ft.Dropdown(
+        label='Language Option',
+        hint_text='Select the language Option',
+        width=200,
+        options=[
+            ft.dropdown.Option(lang_opt_to_label(e)) for e in lang_options
+        ],
+        value=lang_opt_to_label(lang_options[0]),
+        on_change=clean_trans_result,
+    )
+    ft_cell_options = ft.Dropdown(
+        label='Cell Option',
+        hint_text='Select the cell options',
+        width=200,
+        options=[
+            ft.dropdown.Option(cell_override),
+            ft.dropdown.Option(cell_append),
+        ],
+        value=cell_override,
+        on_change=clean_trans_result,
+    )
+    ft_api_options = ft.Dropdown(
+        label='Translate API',
+        hint_text='Select API',
+        width=200,
+        options=[
+            ft.dropdown.Option(api_google),
+            ft.dropdown.Option(api_baidu),
+        ],
+        value=api_google,
+        on_change=clean_trans_result,
+    )
     err_dlg = ft.AlertDialog(
-        title=ft.Text(''), on_dismiss=lambda e: print('Dialog dismissed!')
+        title=ft.Text(''),
+        on_dismiss=lambda e: print('Dialog dismissed!'),
     )
 
     page.overlay.append(pick_files_dialog)
     page.add(
         ft.Container(
             padding=20,
-            content=ft.Column(
-                controls=[
-                    ft.Row(
-                        [
-                            ft_language_dropdown,
-                            ft_cell_options,
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [
-                            ft_sheet_dropdown,
-                            ft_api_options,
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [
-                            ft.ElevatedButton(
-                                'Select Excel File',
-                                icon=ft.icons.UPLOAD_FILE,
-                                width=200,
-                                on_click=lambda _: pick_files_dialog.pick_files(
-                                    allow_multiple=False
-                                ),
-                            ),
-                            ft.ElevatedButton(
-                                'Translate',
-                                icon=ft.icons.TRANSLATE,
-                                width=200,
-                                on_click=translate_click
-                            ),
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [
-                            ft_progress,
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                    ft.Row(
-                        [
-                            ft_result_text,
-                        ],
-                        alignment=ft.MainAxisAlignment.CENTER,
-                    ),
-                ]
-            )
-        ),
-    )
+            content=ft.Column(controls=[
+                ft.Row(
+                    [
+                        ft_language_dropdown,
+                        ft_cell_options,
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft_sheet_dropdown,
+                        ft_api_options,
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft.ElevatedButton(
+                            'Select Excel File',
+                            icon=ft.icons.UPLOAD_FILE,
+                            width=200,
+                            on_click=lambda _: pick_files_dialog.pick_files(
+                                allow_multiple=False),
+                        ),
+                        ft.ElevatedButton(
+                            'Translate',
+                            icon=ft.icons.TRANSLATE,
+                            width=200,
+                            on_click=translate_click,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft_progress,
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+                ft.Row(
+                    [
+                        ft_result_text,
+                    ],
+                    alignment=ft.MainAxisAlignment.CENTER,
+                ),
+            ], ),
+        ), )
 
 
 ft.app(target=main)
