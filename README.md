@@ -24,7 +24,7 @@ $ cd excel-trans
 $ pip3 install -r requirements.txt
 
 # 3. Try it!
-$ python compare.py
+$ python main.py
 ```
 
 ## How to Build?
