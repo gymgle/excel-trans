@@ -7,26 +7,28 @@ import utils
 
 google_lang = {
     'zh': 'zh-CN',
-    'en': 'en'
 }
 
 
 class Translator:
+
     def __init__(self, from_lang, to_lang):
         self.from_lang = from_lang
         self.to_lang = to_lang
 
     def translate(self, query):
-        raise NotImplementedError('translate method must be implemented in the child class')
+        raise NotImplementedError(
+            'translate method must be implemented in the child class')
 
 
 class GoogleTranslate(Translator):
+
     def __init__(self, from_lang, to_lang):
         super().__init__(from_lang, to_lang)
         self.client = EasyGoogleTranslate(
-            source_language=google_lang[from_lang],
-            target_language=google_lang[to_lang],
-            timeout=10
+            source_language=google_lang.get(from_lang, from_lang),
+            target_language=google_lang.get(to_lang, to_lang),
+            timeout=10,
         )
 
     def translate(self, query):
@@ -34,6 +36,7 @@ class GoogleTranslate(Translator):
 
 
 class BaiduTranslate(Translator):
+
     def __init__(self, from_lang, to_lang):
         super().__init__(from_lang, to_lang)
         self.src = from_lang
@@ -45,7 +48,14 @@ class BaiduTranslate(Translator):
     def translate(self, query):
         salt = random.randint(32768, 65536)
         sign = utils.md5_sign(self.app_id + query + str(salt) + self.app_key)
-        payload = {'appid': self.app_id, 'q': query, 'from': self.src, 'to': self.dst, 'salt': salt, 'sign': sign}
+        payload = {
+            'appid': self.app_id,
+            'q': query,
+            'from': self.src,
+            'to': self.dst,
+            'salt': salt,
+            'sign': sign
+        }
         headers = {'Content-Type': 'application/x-www-form-urlencoded'}
         rsp = requests.post(self.url, params=payload, headers=headers)
         result = rsp.json().get('trans_result', [])
